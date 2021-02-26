@@ -1,2 +1,2 @@
-# note
-Learning notes
+# 笔记
+- 学习相关的笔记
