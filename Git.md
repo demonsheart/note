@@ -56,9 +56,9 @@ git config --global user.email "your email"
 
 ### 原理图
 
-![image-20210226115256671](picture\git_principle.png)
+![image-20210226115256671](picture/git_principle.png)
 
-![image-20210226120004820](picture\git_dir.png)
+![image-20210226120004820](picture/git_dir.png)
 
 
 
