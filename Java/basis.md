@@ -1,6 +1,6 @@
 # Java基础
 
-
+[Java菜鸟教程链接](https://www.runoob.com/java/java-basic-datatypes.html)
 
 ## 编译运行
 
@@ -55,3 +55,19 @@ long num1 = 3L; //long 类型要在后面加个L
 float num2 = 3.1F; //float 类型要在后面加个F
 ```
 
+```java
+//JDK7新特性
+int money = 10_0000_0000;
+System.out.println(money);
+```
+
+## 变量
+
+### 命名规范
+
+* 见名知意
+* 类成员变量：首字母小写 驼峰 lastName
+* 局部变量： 首字母小写 驼峰 lastName
+* 常量： 大写字母和下划线  MAX_LENTH
+* 类名： 首字母大写 驼峰 GoodMan
+* 方法名：首字母小写 驼峰 runALL()
