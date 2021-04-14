@@ -25,3 +25,13 @@ conda env create -f environment.yaml // 用配置文件创建新的虚拟环境
 ```
 
 * 激活环境后在其命令行下使用pip命令就是在该环境下安装。
+
+* 在vscode内终端，激活环境用source命令
+
+  ```bash
+  source activate
+  source deactivate
+  source activate [env-name]
+  ```
+
+* 
