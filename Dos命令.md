@@ -30,5 +30,7 @@ md test #创建目录
 rd test #删除目录
 cd>a.txt #新建文件
 del a.txt #删除文件
+
+rundll32.exe user32.dll,LockWorkStation # 锁屏
 ```
 

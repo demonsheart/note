@@ -1,0 +1,376 @@
+## Java 多线程
+
+### 线程的创建
+
+* 通过接口创建线程：
+
+```Java
+public class Main {
+    public static void main(String[] args) {
+        Thread t = new Thread(new MyRunnable());
+        t.start(); // 启动新线程
+    }
+}
+
+class MyRunnable implements Runnable {
+    @Override
+    public void run() {
+        System.out.println("start new thread!");
+    }
+}
+```
+
+* 从`t`线程开始运行以后，两个线程就开始同时运行了，并且由操作系统调度，程序本身无法确定线程的调度顺序
+
+* 线程设置优先级
+
+  ```Java
+  TThread.setPriority(int n) // 1 ~ 10, 默认5
+  ```
+
+
+
+### 线程的状态
+
+在Java程序中，一个线程对象只能调用一次`start()`方法启动新线程，并在新线程中执行`run()`方法。一旦`run()`方法执行完毕，线程就结束了。因此，Java线程的状态有以下几种：
+
+- New：新创建的线程，尚未执行；
+- Runnable：运行中的线程，正在执行`run()`方法的Java代码；
+- Blocked：运行中的线程，因为某些操作被阻塞而挂起；
+- Waiting：运行中的线程，因为某些操作在等待中；
+- Timed Waiting：运行中的线程，因为执行`sleep()`方法正在计时等待；
+- Terminated：线程已终止，因为`run()`方法执行完毕。
+
+一个线程还可以等待另一个线程直到其运行结束。例如，`main`线程在启动`t`线程后，可以通过`t.join()`等待`t`线程结束后再继续运行：
+
+```Java
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        Thread t = new Thread(() -> {
+            System.out.println("hello");
+        });
+        System.out.println("start");
+        t.start();
+        t.join();
+        System.out.println("end");
+    }
+}
+/*
+start
+hello
+end
+*/
+```
+
+
+
+### 中断线程
+
+中断一个线程非常简单，只需要在其他线程中对目标线程调用`interrupt()`方法，目标线程需要反复检测自身状态是否是interrupted状态，如果是，就立刻结束运行。
+
+```Java
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        Thread t = new MyThread();
+        t.start();
+        Thread.sleep(1000);
+        t.interrupt(); // 中断t线程
+        t.join(); // 等待t线程结束
+        System.out.println("end");
+    }
+}
+
+class MyThread extends Thread {
+    public void run() {
+        Thread hello = new HelloThread();
+        hello.start(); // 启动hello线程
+        try {
+            hello.join(); // 等待hello线程结束
+        } catch (InterruptedException e) {
+            System.out.println("interrupted!");
+        }
+        hello.interrupt();
+    }
+}
+
+class HelloThread extends Thread {
+    public void run() {
+        int n = 0;
+        while (!isInterrupted()) {
+            n++;
+            System.out.println(n + " hello!");
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+    }
+}
+/*
+1 hello!
+2 hello!
+3 hello!
+4 hello!
+5 hello!
+6 hello!
+7 hello!
+8 hello!
+9 hello!
+10 hello!
+interrupted!
+end
+*/
+
+```
+
+对目标线程调用`interrupt()`方法可以请求中断一个线程，目标线程通过检测`isInterrupted()`标志获取自身是否已中断。如果目标线程处于等待状态，该线程会捕获到`InterruptedException`；
+
+目标线程检测到`isInterrupted()`为`true`或者捕获了`InterruptedException`都应该立刻结束自身线程；
+
+
+
+### 守护进程
+
+守护线程是指为其他线程服务的线程。在JVM中，所有非守护线程都执行完毕后，无论有没有守护线程，虚拟机都会自动退出。因此，JVM退出时，不必关心守护线程是否已结束。
+
+创建守护进程，在调用`start()`方法前，调用`setDaemon(true)`把该线程标记为守护线程：
+
+```Java
+TThread t = new MyThread();
+tt.setDaemon(true);
+tt.start();
+```
+
+在守护线程中，编写代码要注意：守护线程不能持有任何需要关闭的资源，例如打开文件等，因为虚拟机退出时，守护线程没有任何机会来关闭文件，这会导致数据丢失。
+
+
+
+### 线程同步
+
+Java程序使用`synchronized`关键字对一个对象进行加锁：
+
+```java
+ssynchronized(lock) {
+     n = n + 1;
+}}
+```
+
+`synchronized`保证了代码块在任意时刻最多只有一个线程能执行。
+
+```Java
+public class Main {
+    public static void main(String[] args) throws Exception {
+        var add = new AddThread();
+        var dec = new DecThread();
+        add.start();
+        dec.start();
+        add.join();
+        dec.join();
+        System.out.println(Counter.count);
+    }
+}
+
+class Counter {
+    public static final Object lock = new Object(); // 锁
+    public static int count = 0;
+}
+
+class AddThread extends Thread {
+    public void run() {
+        for (int i=0; i<10000; i++) {
+            synchronized(Counter.lock) {
+                Counter.count += 1;
+            }
+        }
+    }
+}
+
+class DecThread extends Thread {
+    public void run() {
+        for (int i=0; i<10000; i++) {
+            synchronized(Counter.lock) {
+                Counter.count -= 1;
+            }
+        }
+    }
+}
+```
+
+
+
+### 同步方法
+
+让线程自己选择锁对象往往会使得代码逻辑混乱，也不利于封装。更好的方法是把`synchronized`逻辑封装起来。例如，我们编写一个计数器如下：
+
+```java
+public class Counter {
+    private int count = 0;
+
+    public void add(int n) {
+        synchronized(this) {
+            count += n;
+        }
+    }
+
+    public void dec(int n) {
+        synchronized(this) {
+            count -= n;
+        }
+    }
+
+    public int get() {
+        return count;
+    }
+}
+```
+
+这样一来，线程调用`add()`、`dec()`方法时，它不必关心同步逻辑，因为`synchronized`代码块在`add()`、`dec()`方法内部。并且，我们注意到，`synchronized`锁住的对象是`this`，即当前实例，这又使得创建多个`Counter`实例的时候，它们之间互不影响，可以并发执行：
+
+当我们锁住的是`this`实例时，实际上可以用`synchronized`修饰这个方法。下面两种写法是等价的：
+
+```java
+ppublic void add(int n) {
+     synchronized(this) { // 锁住this
+         count += n;
+     } // 解锁
+}
+ppublic synchronized void add(int n) { // 锁住this
+     count += n;
+}  }// 解锁
+```
+
+### 死锁
+
+JVM允许同一个线程重复获取同一个锁，这种能被同一个线程反复获取的锁，就叫做可重入锁。
+
+由于Java的线程锁是可重入锁，所以，获取锁的时候，不但要判断是否是第一次获取，还要记录这是第几次获取。每获取一次锁，记录+1，每退出`synchronized`块，记录-1，减到0的时候，才会真正释放锁。
+
+我们应该如何避免死锁呢？答案是：**线程获取锁的顺序要一致**。即严格按照先获取`lockA`，再获取`lockB`的顺序
+
+### 多线程下总时间的统计
+
+```java
+// 通过latch阻塞主函数线程
+// 当所有线程跑完 解除阻塞 进而统计时间
+public static void main(String args[]) throws InterruptedException {
+     CountDownLatch latch = new CountDownLatch(5);//设置计数值
+     System.out.println("主线程开始");
+     long startTime = System.currentTimeMillis();
+     for(int i=0;i<5;i++) {
+         new Thread() {
+             @Override
+             public void run() {
+                 System.out.println(currentThread().getName()+"开始执行..");
+                 try {
+                     sleep(1000);
+                 } catch (InterruptedException e) {
+                     e.printStackTrace();
+                 }
+                 System.out.println(currentThread().getName()+"结束执行..");
+                 latch.countDown();
+             }
+         }.start();
+     }
+     latch.await();
+     long endTime = System.currentTimeMillis();
+     System.out.println("多线程运行时间："+(endTime-startTime)+"ms");//1007ms
+     System.out.println("主线程结束");
+ }
+```
+
+### 线程池
+
+因为`ExecutorService`只是接口，Java标准库提供的几个常用实现类有：
+
+- FixedThreadPool：线程数固定的线程池；
+- CachedThreadPool：线程数根据任务动态调整的线程池；
+- SingleThreadExecutor：仅单线程执行的线程池。
+
+创建这些线程池的方法都被封装到`Executors`这个类中。我们以`FixedThreadPool`为例，看看线程池的执行逻辑：
+
+```java
+import java.util.concurrent.*;
+ 
+public class Main {
+    public static void main(String[] args) {
+        // 创建一个固定大小的线程池:
+        ExecutorService es = Executors.newFixedThreadPool(4);
+        for (int i = 0; i < 6; i++) {
+            es.submit(new Task("" + i));
+        }
+        // 关闭线程池:
+        es.shutdown();
+    }
+}
+
+class Task implements Runnable {
+    private final String name;
+
+    public Task(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public void run() {
+        System.out.println("start task " + name);
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+        }
+        System.out.println("end task " + name);
+    }
+}
+/*
+start task 0
+start task 1
+start task 2
+start task 3
+end task 0
+start task 4
+end task 1
+start task 5
+end task 2
+end task 3
+end task 4
+end task 5
+*/
+```
+
+
+
+### 使用Future
+
+Java标准库还提供了一个`Callable`接口，和`Runnable`接口比，它多了一个返回值：
+
+```java
+class Task implements Callable<String> {
+    public String call() throws Exception {
+        return longTimeCalculation(); 
+    }
+}
+```
+
+并且`Callable`接口是一个泛型接口，可以返回指定类型的结果。
+
+仔细看`ExecutorService.submit()`方法，可以看到，它返回了一个`Future`类型，一个`Future`类型的实例代表一个未来能获取结果的对象：
+
+```java
+ExecutorService executor = Executors.newFixedThreadPool(4); 
+// 定义任务:
+Callable<String> task = new Task();
+// 提交任务并获得Future:
+Future<String> future = executor.submit(task);
+// 从Future获取异步执行返回的结果:
+String result = future.get(); // 可能阻塞
+```
+
+当我们提交一个`Callable`任务后，我们会同时获得一个`Future`对象，然后，我们在主线程某个时刻调用`Future`对象的`get()`方法，就可以获得异步执行的结果。在调用`get()`时，如果异步任务已经完成，我们就直接获得结果。如果异步任务还没有完成，那么`get()`会阻塞，直到任务完成后才返回结果。
+
+一个`Future<V>`接口表示一个未来可能会返回的结果，它定义的方法有：
+
+- `get()`：获取结果（可能会等待）
+- `get(long timeout, TimeUnit unit)`：获取结果，但只等待指定的时间；
+- `cancel(boolean mayInterruptIfRunning)`：取消当前任务；
+- `isDone()`：判断任务是否已完成。
+
