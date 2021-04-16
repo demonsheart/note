@@ -248,6 +248,108 @@ JVM允许同一个线程重复获取同一个锁，这种能被同一个线程�
 
 我们应该如何避免死锁呢？答案是：**线程获取锁的顺序要一致**。即严格按照先获取`lockA`，再获取`lockB`的顺序
 
+### wait() 和 notify()
+
+`wait`和`notify`用于多线程协调运行：
+
+`wait()`方法调用时，会*释放*线程获得的锁，`wait()`方法返回后，线程又会重新试图获得锁。
+
+如何让等待的线程被重新唤醒，然后从`wait()`方法返回？答案是在**相同的锁对象**上调用`notify()`方法。
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        TaskQueue q = new TaskQueue();
+        ArrayList<Thread> ts = new ArrayList<Thread>();
+        for (int i = 0; i < 5; i++) {
+            // 执行task:
+            Thread t = new Thread() {
+                public void run() {
+                    // 执行task:
+                    while (true) {
+                        try {
+                            String s = q.getTask();
+                            System.out.println("execute task: " + s);
+                        } catch (InterruptedException e) {
+                            return;
+                        }
+                    }
+                }
+            };
+            t.start();
+            ts.add(t);
+        }
+        // 放入task:
+        Thread add = new Thread(() -> {
+            for (int i = 0; i < 10; i++) {
+                // 放入task:
+                String s = "t-" + Math.random();
+                System.out.println("add task: " + s);
+                q.addTask(s);
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                }
+            }
+        });
+        add.start();
+        add.join();
+        Thread.sleep(100);
+        for (Thread t : ts) {
+            t.interrupt();
+        }
+    }
+}
+
+class TaskQueue {
+    Queue<String> queue = new LinkedList<>();
+
+    public synchronized void addTask(String s) {
+        this.queue.add(s);
+        this.notifyAll();
+    }
+
+    public synchronized String getTask() throws InterruptedException {
+        while (queue.isEmpty()) {
+            this.wait();
+        }
+        return queue.remove();
+    }
+}
+/*
+add task: t-0.7390054228507345
+execute task: t-0.7390054228507345
+add task: t-0.4799170678401632
+execute task: t-0.4799170678401632
+add task: t-0.8396068309408362
+execute task: t-0.8396068309408362
+add task: t-0.30795880265284725
+execute task: t-0.30795880265284725
+add task: t-0.7406046574781925
+execute task: t-0.7406046574781925
+add task: t-0.7058235849041266
+execute task: t-0.7058235849041266
+add task: t-0.43245486929040067
+execute task: t-0.43245486929040067
+add task: t-0.9796264369676578
+execute task: t-0.9796264369676578
+add task: t-0.20533150778320863
+execute task: t-0.20533150778320863
+add task: t-0.6809970252509452
+execute task: t-0.6809970252509452
+*/
+```
+
+
+
+- 在`synchronized`内部可以调用`wait()`使线程进入等待状态；
+- 必须在已获得的锁对象上调用`wait()`方法；
+- 在`synchronized`内部可以调用`notify()`或`notifyAll()`唤醒其他等待线程；
+- 必须在已获得的锁对象上调用`notify()`或`notifyAll()`方法；
+- 已唤醒的线程还需要重新获得锁后才能继续执行。
+
 ### 多线程下总时间的统计
 
 ```java
