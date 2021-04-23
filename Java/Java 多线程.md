@@ -62,7 +62,14 @@ end
 */
 ```
 
+### 优先级
 
+```java
+Thread.setPriority(5); // 0 ~ 10
+Thread.start();
+```
+
+PS：优先级只是设置线程资源占比重，**cpu优先执行优先级高的概率大**。
 
 ### 中断线程
 
@@ -475,4 +482,197 @@ String result = future.get(); // 可能阻塞
 - `get(long timeout, TimeUnit unit)`：获取结果，但只等待指定的时间；
 - `cancel(boolean mayInterruptIfRunning)`：取消当前任务；
 - `isDone()`：判断任务是否已完成。
+
+### ReentrantLock
+
+从Java 5开始，引入了一个高级的处理并发的`java.util.concurrent`包，它提供了大量更高级的并发功能，能大大简化多线程程序的编写。
+
+我们知道Java语言直接提供了`synchronized`关键字用于加锁，但这种锁一是很重，二是获取时必须一直等待，没有额外的尝试机制。
+
+`java.util.concurrent.locks`包提供的`ReentrantLock`用于替代`synchronized`加锁，我们来看一下传统的`synchronized`代码：
+
+```java
+public class Counter {
+    private int count;
+
+    public void add(int n) {
+        synchronized(this) {
+            count += n;
+        }
+    }
+}
+```
+
+如果用`ReentrantLock`替代，可以把代码改造为：
+
+```java
+public class Counter {
+    private final Lock lock = new ReentrantLock();
+    private int count;
+
+    public void add(int n) {
+        lock.lock();
+        try {
+            count += n;
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+```
+
+因为`synchronized`是Java语言层面提供的语法，所以我们不需要考虑异常，而`ReentrantLock`是Java代码实现的锁，我们就必须先获取锁，然后在`finally`中正确释放锁。
+
+顾名思义，`ReentrantLock`是可重入锁，它和`synchronized`一样，一个线程可以多次获取同一个锁。
+
+和`synchronized`不同的是，`ReentrantLock`可以尝试获取锁：
+
+```java
+if (lock.tryLock(1, TimeUnit.SECONDS)) {
+    try {
+        ...
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+上述代码在尝试获取锁的时候，最多等待1秒。如果1秒后仍未获取到锁，`tryLock()`返回`false`，程序就可以做一些额外处理，而不是无限等待下去。
+
+所以，使用`ReentrantLock`比直接使用`synchronized`更安全，线程在`tryLock()`失败的时候不会导致死锁。
+
+### Condition
+
+`Condition`对象来实现`wait`和`notify`的功能。
+
+```java
+class TaskQueue {
+    private final Lock lock = new ReentrantLock();
+    private final Condition condition = lock.newCondition();
+    private Queue<String> queue = new LinkedList<>();
+
+    public void addTask(String s) {
+        lock.lock();
+        try {
+            queue.add(s);
+            condition.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String getTask() {
+        lock.lock();
+        try {
+            while (queue.isEmpty()) {
+                condition.await();
+            }
+            return queue.remove();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+```
+
+可见，使用`Condition`时，引用的`Condition`对象必须从`Lock`实例的`newCondition()`返回，这样才能获得一个绑定了`Lock`实例的`Condition`实例。
+
+`Condition`提供的`await()`、`signal()`、`signalAll()`原理和`synchronized`锁对象的`wait()`、`notify()`、`notifyAll()`是一致的，并且其行为也是一样的：
+
+- `await()`会释放当前锁，进入等待状态；
+- `signal()`会唤醒某个等待线程；
+- `signalAll()`会唤醒所有等待线程；
+- 唤醒线程从`await()`返回后需要重新获得锁。
+
+此外，和`tryLock()`类似，`await()`可以在等待指定时间后，如果还没有被其他线程通过`signal()`或`signalAll()`唤醒，可以自己醒来：
+
+```java
+if (condition.await(1, TimeUnit.SECOND)) {
+    // 被其他线程唤醒
+} else {
+    // 指定时间内没有被其他线程唤醒
+}
+```
+
+一个详细的例子
+
+```java
+package com.study.thread;
+
+import java.util.*;
+import java.util.concurrent.locks.*;
+
+public class ConditionTest {
+    public static void main(String[] args) throws InterruptedException {
+        TaskQueue q = new TaskQueue();
+        ArrayList<Thread> ts = new ArrayList<Thread>();
+        for (int i = 0; i < 5; i++) {
+            // 执行task:
+            Thread t = new Thread() {
+                public void run() {
+                    // 执行task:
+                    while (true) {
+                        try {
+                            String s = q.getTask();
+                            System.out.println("execute task: " + s);
+                        } catch (InterruptedException e) {
+                            return;
+                        }
+                    }
+                }
+            };
+            t.start();
+            ts.add(t);
+        }
+        Thread add = new Thread(() -> {
+            for (int i = 0; i < 10; i++) {
+                // 放入task:
+                String s = "t-" + Math.random();
+                System.out.println("add task: " + s);
+                q.addTask(s);
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                }
+            }
+        });
+        add.start();
+        add.join();
+        Thread.sleep(100);
+        for (Thread t : ts) {
+            t.interrupt();
+        }
+    }
+}
+
+class TaskQueue {
+    private final Lock lock = new ReentrantLock();
+    private final Condition condition = lock.newCondition();
+    private Queue<String> queue = new LinkedList<>();
+
+    public void addTask(String s) {
+        lock.lock();
+        try {
+            queue.add(s);
+            condition.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String getTask() throws InterruptedException {
+        lock.lock();
+        try {
+            while (queue.isEmpty()) {
+                condition.await();
+            }
+            return queue.remove();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+```
+
+执行task的进程会由condition.await()等待任务的到来，当新任务推入队列后，由condition.signalAll()唤醒。
 
