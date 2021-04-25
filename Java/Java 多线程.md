@@ -351,7 +351,30 @@ execute task: t-0.6809970252509452
 */
 ```
 
+这个例子中，我们重点关注`addTask()`方法，内部调用了`this.notifyAll()`而不是`this.notify()`，使用`notifyAll()`将唤醒所有当前正在`this`锁等待的线程，而`notify()`只会唤醒其中一个（具体哪个依赖操作系统，有一定的随机性）。这是因为可能有多个线程正在`getTask()`方法内部的`wait()`中等待，使用`notifyAll()`将一次性全部唤醒。通常来说，`notifyAll()`更安全。有些时候，如果我们的代码逻辑考虑不周，用`notify()`会导致只唤醒了一个线程，而其他线程可能永远等待下去醒不过来了。
 
+但是，注意到`wait()`方法返回时需要*重新*获得`this`锁。假设当前有3个线程被唤醒，唤醒后，首先要等待执行`addTask()`的线程结束此方法后，才能释放`this`锁，随后，这3个线程中只能有一个获取到`this`锁，剩下两个将继续等待。
+
+再注意到我们在`while()`循环中调用`wait()`，而不是`if`语句：
+
+```java
+public synchronized String getTask() throws InterruptedException {
+    if (queue.isEmpty()) {
+        this.wait();
+    }
+    return queue.remove();
+}
+```
+
+这种写法实际上是错误的，因为线程被唤醒时，需要再次获取`this`锁。多个线程被唤醒后，只有一个线程能获取`this`锁，此刻，该线程执行`queue.remove()`可以获取到队列的元素，然而，剩下的线程如果获取`this`锁后执行`queue.remove()`，此刻队列可能已经没有任何元素了，所以，要始终在`while`循环中`wait()`，并且每次被唤醒后拿到`this`锁就必须再次判断：
+
+```java
+while (queue.isEmpty()) {
+    this.wait();
+}
+```
+
+**小结：**
 
 - 在`synchronized`内部可以调用`wait()`使线程进入等待状态；
 - 必须在已获得的锁对象上调用`wait()`方法；
