@@ -25,6 +25,10 @@ let width = 94
 let widthLabel = label + String(width)
 ```
 
+#### nil值
+
+Swift 的 `nil` 和 Objective-C 中的 `nil` 并不一样。在 Objective-C 中，`nil` 是一个指向不存在对象的指针。在 Swift 中，`nil` 不是指针——它是一个确定的值，用来表示值缺失。任何类型的可选状态都可以被设置为 `nil`，不只是对象类型。
+
 #### 可用\\()来解析成字符串
 
 ```swift
@@ -219,6 +223,66 @@ var numbers = [20, 19, 7, 12]
 hasAnyMatches(list: numbers, condition: lessThanTen)
 ```
 
+#### 可变参数
+
+一个*可变参数（variadic parameter）*可以接受零个或多个值。函数调用时，你可以用可变参数来指定函数参数可以被传入不确定数量的输入值。通过在变量类型名后面加入（`...`）的方式来定义可变参数。
+
+可变参数的传入值在函数体中变为此类型的一个数组。例如，一个叫做 `numbers` 的 `Double...` 型可变参数，在函数体内可以当做一个叫 `numbers` 的 `[Double]` 型的数组常量。
+
+下面的这个函数用来计算一组任意长度数字的 *算术平均数（arithmetic mean)*：
+
+
+
+```swift
+func arithmeticMean(_ numbers: Double...) -> Double {
+    var total: Double = 0
+    for number in numbers {
+        total += number
+    }
+    return total / Double(numbers.count)
+}
+arithmeticMean(1, 2, 3, 4, 5)
+// 返回 3.0, 是这 5 个数的平均数。
+arithmeticMean(3, 8.25, 18.75)
+// 返回 10.0, 是这 3 个数的平均数。
+```
+
+#### 输入输出参数
+
+函数参数默认是常量。试图在函数体中更改参数值将会导致编译错误。这意味着你不能错误地更改参数值。如果你想要一个函数可以修改参数的值，并且想要在这些修改在函数调用结束后仍然存在，那么就应该把这个参数定义为*输入输出参数（In-Out Parameters）*。
+
+定义一个输入输出参数时，在参数定义前加 `inout` 关键字。一个 `输入输出参数`有传入函数的值，这个值被函数修改，然后被传出函数，替换原来的值。
+
+你只能传递变量给输入输出参数。你不能传入常量或者字面量，因为这些量是不能被修改的。当传入的参数作为输入输出参数时，需要在参数名前加 `&` 符，表示这个值可以被函数修改。
+
+> 注意
+>
+> 输入输出参数不能有默认值，而且可变参数不能用 `inout` 标记。
+
+下例中，`swapTwoInts(_:_:)` 函数有两个分别叫做 `a` 和 `b` 的输入输出参数：
+
+```swift
+func swapTwoInts(_ a: inout Int, _ b: inout Int) {
+    let temporaryA = a
+    a = b
+    b = temporaryA
+}
+```
+
+`swapTwoInts(_:_:)` 函数简单地交换 `a` 与 `b` 的值。该函数先将 `a` 的值存到一个临时常量 `temporaryA` 中，然后将 `b` 的值赋给 `a`，最后将 `temporaryA` 赋值给 `b`。
+
+你可以用两个 `Int` 型的变量来调用 `swapTwoInts(_:_:)`。需要注意的是，`someInt` 和 `anotherInt` 在传入 `swapTwoInts(_:_:)` 函数前，都加了 `&` 的前缀：
+
+```swift
+var someInt = 3
+var anotherInt = 107
+swapTwoInts(&someInt, &anotherInt)
+print("someInt is now \(someInt), and anotherInt is now \(anotherInt)")
+// 打印“someInt is now 107, and anotherInt is now 3”
+```
+
+从上面这个例子中，我们可以看到 `someInt` 和 `anotherInt` 的原始值在 `swapTwoInts(_:_:)` 函数中被修改，尽管它们的定义在函数体外。
+
 #### 闭包
 
 可以使用 `{}` 来创建一个匿名闭包。使用 `in` 将参数和返回值类型的声明与闭包函数体进行分离。
@@ -241,6 +305,8 @@ let sortedNumbers = numbers.sorted{ $0 > $1 }
 ```
 
 #### 对象和类
+
+结构体有默认的逐一构造器，而类没有
 
 ```swift
 class NamedShape {
@@ -447,6 +513,27 @@ let threeOfSpades = Card(rank: .three, suit: .spades)
 let threeOfSpadesDescription = threeOfSpades.simpleDescription()
 ```
 
+#### 值类型 & 引用类型
+
+> ***值类型***是这样一种类型，当它被赋值给一个变量、常量或者被传递给一个函数的时候，其**值会被*拷贝*。**
+>
+> 在之前的章节中，你已经大量使用了值类型。实际上，Swift 中所有的基本类型：整数（integer）、浮点数（floating-point number）、布尔值（boolean）、字符串（string)、数组（array）和字典（dictionary），都是值类型，其底层也是使用结构体实现的。
+>
+> Swift 中所有的结构体和枚举类型都是值类型。这意味着它们的实例，以及实例中所包含的任何值类型的属性，在代码中传递的时候都会被复制。
+
+>与值类型不同，*引用类型*在被赋予到一个变量、常量或者被传递到一个函数时，其值不会被拷贝。因此，**使用的是已存在实例的引用，而不是其拷贝**。
+
+#### 恒等运算符
+
+判定两个常量或者变量是否引用同一个类实例有时很有用。
+
+* 相同 ===
+* 不相同 !==
+
+请注意，“相同”（用三个等号表示，`===`）与“等于”（用两个等号表示，`==`）的不同。“相同”表示两个类类型（class type）的常量或者变量引用同一个类实例。“等于”表示两个实例的值“相等”或“等价”，判定时要遵照设计者定义的评判标准。
+
+
+
 #### AnyObject & Any
 
 > AnyObject：可以代表任何class类型的实例；
@@ -454,11 +541,12 @@ let threeOfSpadesDescription = threeOfSpades.simpleDescription()
 
 #### 协议和拓展
 
-协议可以理解为接口
+协议可以理解为接口(抽象类)
 
 ```swift
 protocol SomeProtocol {
     // 这里是协议的定义部分
+    // 可以是属性、方法、构造器等等
 }
 struct SomeStructure: FirstProtocol, AnotherProtocol {
     // 这里是结构体的定义部分
@@ -468,7 +556,7 @@ class SomeClass: SomeSuperClass, FirstProtocol, AnotherProtocol {
 }
 ```
 
-属性要求
+##### 属性要求
 
 如果协议要求属性是可读可写的，那么该属性不能是常量属性或只读的计算型属性。如果协议只要求属性是可读的，那么该属性不仅可以是可读的，如果代码需要的话，还可以是可写的。
 
@@ -481,7 +569,94 @@ protocol SomeProtocol {
 }
 ```
 
+##### 方法要求
+
+**不支持为协议中的方法提供默认参数**
+
+##### 异变方法要求
+
+如果你在协议中定义了一个实例方法，该方法会**改变遵循该协议的类型的实例**，那么在定义协议时需要在方法前加 **`mutating`** 关键字。这使得结构体和枚举能够遵循此协议并满足此方法要求。
+
+> 注意
+>
+> 实现协议中的 `mutating` 方法时，若是类类型，则不用写 `mutating` 关键字。而对于结构体和枚举，则必须写 `mutating` 关键字。
+
+##### 类专属的协议
+
+你通过添加 `AnyObject` 关键字到协议的继承列表，就可以限制协议只能被类类型采纳（以及非结构体或者非枚举的类型）。
+
+```swift
+protocol SomeClassOnlyProtocol: AnyObject, SomeInheritedProtocol {
+    // 这里是类专属协议的定义部分
+}
+```
+
+在以上例子中，协议 `SomeClassOnlyProtocol` 只能被类类型采纳。如果尝试让结构体或枚举类型采纳 `SomeClassOnlyProtocol`，则会导致编译时错误。
+
+##### 检查协议的一致性
+
+你可以使用 [类型转换]() 中描述的 `is` 和 `as` 操作符来检查协议一致性，即是否遵循某协议，并且可以转换到指定的协议类型。检查和转换协议的语法与检查和转换类型是完全一样的：
+
+- `is` 用来检查实例是否遵循某个协议，若遵循则返回 `true`，否则返回 `false`；
+- `as?` 返回一个可选值，当实例遵循某个协议时，返回类型为协议类型的可选值，否则返回 `nil`；
+- `as!` 将实例强制向下转换到某个协议类型，如果强转失败，将触发运行时错误
+
+```swift
+let objects: [AnyObject] = [
+    Circle(radius: 2.0), // 遵守HasArea
+    Country(area: 243_610), // 遵守HasArea
+    Animal(legs: 4) // 不遵守HasArea
+]
+for object in objects {
+    if let objectWithArea = object as? HasArea {
+        print("Area is \(objectWithArea.area)")
+    } else {
+        print("Something that doesn't have an area")
+    }
+}
+// Area is 12.5663708
+// Area is 243610.0
+// Something that doesn't have an areas
+```
+
+##### 为协议扩展添加限制条件
+
+```swift
+extension Collection where Element: Equatable {
+    func allEqual() -> Bool {
+        for element in self {
+            if element != self.first {
+                return false
+            }
+        }
+        return true
+    }
+}
+```
+
+#### 泛型
+
+##### 泛型函数
+
+```swift
+func swap<T>(_ a: inout T, _ b: inout T) {
+  	let tmp = a
+  	a = b
+  	b = tmp
+}
+```
+
+##### 类型约束
+
+在一个类型参数名后面放置一个类名或者协议名，并用冒号进行分隔，来定义类型约束。下面将展示泛型函数约束的基本语法（与泛型类型的语法相同）：
 
 
 
+```swift
+func someFunction<T: SomeClass, U: SomeProtocol>(someT: T, someU: U) {
+    // 这里是泛型函数的函数体部分
+}
+```
+
+上面这个函数有两个类型参数。第一个类型参数 `T` 必须是 `SomeClass` 子类；第二个类型参数 `U` 必须符合 `SomeProtocol` 协议。
 
