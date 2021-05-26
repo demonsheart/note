@@ -11,4 +11,4 @@
 * 软件体系实验四 6月26日
 * 互联网编程实验四 6月27日 星期日
 
-![课表](C:\Users\86135\Desktop\ddl\lession.png)
+![课表](picture/lession.png)
